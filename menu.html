@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Meal Menu - Meals on Wheels</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+</head>
+
+<body class="bg-gradient-to-r from-indigo-500 to-purple-600 min-h-screen font-sans">
+
+  <div class="max-w-6xl mx-auto px-4 py-8">
+    <h1 class="text-4xl text-white font-bold text-center mb-6 animate__animated animate__fadeInDown">🍽️ Choose Your Meal</h1>
+
+    <!-- Passenger Details -->
+    <div id="passengerDetails" class="bg-white p-4 rounded shadow-md mb-8 animate__animated animate__fadeInUp"></div>
+
+    <!-- Meals Grid -->
+    <div id="mealGrid" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
+
+    <!-- Floating Cart Button -->
+    <div class="fixed bottom-5 right-5">
+      <div class="relative">
+        <div onclick="openCartModal()" class="bg-white p-4 rounded-full shadow-lg flex items-center gap-3 cursor-pointer hover:scale-105 transition">
+          <span class="font-semibold text-lg">🛒 View Cart</span>
+          <span id="cartCount" class="bg-red-500 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full absolute -top-2 -right-2">0</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cart Modal -->
+  <!-- Cart Modal -->
+<div id="cartModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+    <div class="flex items-center justify-center h-full w-full">
+      <div class="bg-white w-full max-w-lg p-6 rounded shadow-lg animate__animated animate__zoomIn">
+        <h2 class="text-2xl font-bold mb-4">🛒 Your Cart</h2>
+        <div id="cartItems" class="space-y-4 max-h-60 overflow-y-auto"></div>
+        <div class="flex justify-between items-center mt-6">
+          <button onclick="closeCartModal()" class="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Close</button>
+          <button onclick="checkout()" class="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700">Checkout</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+
+<script>
+  // 🔥 Firebase config
+  const firebaseConfig = {
+    apiKey: "AIzaSyDN2T8z9fILTmLE7AfIUTEZUZDcJc5lyWo",
+    authDomain: "meals-on-wheels-4d406.firebaseapp.com",
+    databaseURL: "https://meals-on-wheels-4d406-default-rtdb.firebaseio.com",
+    projectId: "meals-on-wheels-4d406",
+    storageBucket: "meals-on-wheels-4d406.appspot.com",
+    messagingSenderId: "839338162117",
+    appId: "1:839338162117:web:32ba607a2f92328d4bfdac",
+    measurementId: "G-4CFY6T113P"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  let cart = JSON.parse(localStorage.getItem("cart")) || {};
+
+  function updateCartCount() {
+    const count = Object.values(cart).reduce((sum, item) => sum + item.quantity, 0);
+    document.getElementById("cartCount").innerText = count;
+  }
+
+  async function fetchMeals() {
+    const mealGrid = document.getElementById("mealGrid");
+    mealGrid.innerHTML = "";
+
+    const querySnapshot = await db.collection("meals").get();
+    querySnapshot.forEach((doc) => {
+      const meal = doc.data();
+      const id = doc.id;
+
+      const card = document.createElement("div");
+      card.className = "bg-white rounded-lg shadow-md p-4 animate__animated animate__fadeInUp flex flex-col";
+
+      card.innerHTML = `
+        <img src="${meal.image || 'https://via.placeholder.com/300'}" class="w-full h-48 object-cover rounded mb-3">
+        <h2 class="text-xl font-bold text-indigo-700 mb-1">${meal.name}</h2>
+        <p class="text-gray-600 text-sm mb-2">${meal.description || ''}</p>
+        <div class="flex justify-between items-center mt-auto">
+          <span class="text-lg font-semibold text-green-600">₹${meal.price}</span>
+          <button class="bg-indigo-600 text-white px-4 py-1 rounded hover:bg-indigo-700" onclick="addToCart('${id}', '${meal.name}', ${meal.price})">Add</button>
+        </div>
+      `;
+      mealGrid.appendChild(card);
+    });
+  }
+
+  function addToCart(id, name, price) {
+  if (!cart[id]) {
+    cart[id] = { name, price, quantity: 1 };
+  } else {
+    cart[id].quantity += 1;
+  }
+  localStorage.setItem("cart", JSON.stringify(cart));
+  updateCartCount();
+  showAlert("Item added to cart!");
+}
+
+
+  function openCartModal() {
+    const cartItemsContainer = document.getElementById("cartItems");
+    cartItemsContainer.innerHTML = "";
+
+    Object.entries(cart).forEach(([id, item]) => {
+      const itemDiv = document.createElement("div");
+      itemDiv.className = "flex justify-between items-center bg-gray-100 p-3 rounded";
+
+      itemDiv.innerHTML = `
+        <div>
+          <p class="font-semibold">${item.name}</p>
+          <p class="text-sm text-gray-600">₹${item.price} × ${item.quantity} = ₹${item.price * item.quantity}</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="changeQuantity('${id}', -1)" class="bg-red-500 text-white px-2 rounded">-</button>
+          <span>${item.quantity}</span>
+          <button onclick="changeQuantity('${id}', 1)" class="bg-green-500 text-white px-2 rounded">+</button>
+        </div>
+      `;
+      cartItemsContainer.appendChild(itemDiv);
+    });
+
+    document.getElementById("cartModal").classList.remove("hidden");
+  }
+
+  function closeCartModal() {
+    document.getElementById("cartModal").classList.add("hidden");
+  }
+
+  function changeQuantity(id, delta) {
+    if (cart[id]) {
+      cart[id].quantity += delta;
+      if (cart[id].quantity <= 0) {
+        delete cart[id];
+      }
+      localStorage.setItem("cart", JSON.stringify(cart));
+      updateCartCount();
+      openCartModal();
+    }
+  }
+
+  function checkout() {
+    alert("Proceeding to checkout...");
+    // You can redirect to payment page or Firebase logic here
+    closeCartModal();
+  }
+
+  async function fetchPNRDetails() {
+    const pnr = localStorage.getItem("pnr");
+    if (!pnr) return;
+
+    const passengerDiv = document.getElementById("passengerDetails");
+
+    try {
+      const doc = await db.collection("pnrs").doc(pnr).get();
+      if (doc.exists) {
+        const data = doc.data();
+        passengerDiv.innerHTML = `
+          <h2 class="text-lg font-bold mb-2 text-indigo-800">👤 Passenger Details</h2>
+          <p><strong>Name:</strong> ${data.name}</p>
+          <p><strong>Seat:</strong> ${data.coachNumber} ${data.seat}</p>
+          <p><strong>Train:</strong> ${data.train} (${data.trainNumber})</p>
+          <p><strong>From:</strong> ${data.fromStation} → <strong>To:</strong> ${data.toStation}</p>
+          <p><strong>PNR:</strong> ${pnr}</p>
+        `;
+      } else {
+        passengerDiv.innerHTML = `<p class="text-red-500">PNR not found.</p>`;
+      }
+    } catch (err) {
+      passengerDiv.innerHTML = `<p class="text-red-500">Error fetching PNR details.</p>`;
+    }
+  }
+  function showAlert(message) {
+  const alertBox = document.getElementById("alertBox");
+  alertBox.innerText = message;
+  alertBox.classList.remove("hidden", "animate__fadeOutUp");
+  alertBox.classList.add("animate__fadeInDown");
+
+  setTimeout(() => {
+    alertBox.classList.remove("animate__fadeInDown");
+    alertBox.classList.add("animate__fadeOutUp");
+  }, 2000);
+}
+
+
+  // Init
+  fetchPNRDetails();
+  fetchMeals();
+  updateCartCount();
+</script>
+
+<div id="alertBox" class="fixed top-5 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded shadow-md hidden z-50 animate__animated">
+    Item added to cart!
+  </div>
+</body>
+</html>

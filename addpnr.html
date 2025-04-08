@@ -29,6 +29,11 @@
       e.preventDefault();
       const pnr = document.getElementById("pnr").value;
       const train = document.getElementById("train").value;
+      const trainNumber = document.getElementById("trainNumber").value;
+      
+      const source = document.getElementById("source").value;
+
+      const destination = document.getElementById("destination").value;
       const name = document.getElementById("name").value;
       const age = document.getElementById("age").value;
       const seat = document.getElementById("seat").value;
@@ -37,7 +42,10 @@
       try {
         await setDoc(doc(db, "pnrs", pnr), {
           train,
+          trainNumber,
           name,
+          source,
+          destination,
           age,
           seat,
           coachNumber
@@ -57,6 +65,12 @@
     <h2 class="text-xl font-bold mb-4">Admin - Add PNR Details</h2>
     <input id="pnr" type="text" placeholder="PNR Number" required class="w-full mb-4 p-2 border rounded" />
     <input id="train" type="text" placeholder="Train Name" required class="w-full mb-4 p-2 border rounded" />
+    <input id="trainNumber" type="text" placeholder="Train Number" required class="w-full mb-4 p-2 border rounded" />
+
+    <input id="source" type="text" placeholder="Source Station" required class="w-full mb-4 p-2 border rounded" />
+
+    <input id="destination" type="text" placeholder="Destination Station" required class="w-full mb-4 p-2 border rounded" />
+
     <input id="name" type="text" placeholder="Passenger Name" required class="w-full mb-4 p-2 border rounded" />
     <input id="age" type="number" placeholder="Passenger Age" required class="w-full mb-4 p-2 border rounded" />
     <input id="seat" type="text" placeholder="Seat Number" required class="w-full mb-4 p-2 border rounded" />

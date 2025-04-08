@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Train Food Booking</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-gray-100 font-sans">
+
+  <header class="bg-blue-700 text-white p-4 text-center text-2xl font-bold">
+    Meals on Wheels 🍱
+  </header>
+
+  <main class="p-6">
+    <h2 class="text-xl font-semibold mb-4">Menu</h2>
+    <div id="meal-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6"></div>
+
+    <!-- Cart -->
+    <h2 class="text-xl font-semibold mt-10 mb-4">🛒 Your Cart</h2>
+    <div id="cart" class="bg-white shadow p-4 rounded space-y-2"></div>
+    <div class="text-right mt-2">
+      <button onclick="openPNRModal()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Checkout</button>
+    </div>
+  </main>
+
+  <!-- PNR Modal -->
+  <div id="pnr-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden" onclick="closePNRModal(event)">
+    <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md" onclick="event.stopPropagation();">
+      <h3 class="text-lg font-semibold mb-2">Enter Your PNR</h3>
+      <input type="text" id="pnrInput" class="border w-full p-2 rounded mb-4" placeholder="10-digit PNR">
+      <button onclick="proceedToPayment()" class="bg-blue-600 text-white px-4 py-2 rounded w-full">Proceed</button>
+    </div>
+  </div>
+
+  <!-- Payment Page -->
+  <div id="payment-section" class="fixed inset-0 bg-white hidden p-8">
+    <h2 class="text-2xl font-bold mb-4">Passenger Details & Payment</h2>
+    <div id="passenger-details" class="mb-4 text-gray-700"></div>
+    <h3 class="font-semibold mb-2">Order Summary</h3>
+    <div id="order-summary" class="space-y-2 mb-4"></div>
+    <button onclick="completePayment()" class="bg-green-500 text-white px-6 py-2 rounded hover:bg-green-600">Simulate Payment ✅</button>
+  </div>
+
+  <!-- Review Page -->
+  <div id="review-section" class="fixed inset-0 bg-white flex items-center justify-center hidden">
+    <div class="p-6 max-w-md w-full text-center">
+      <h2 class="text-xl font-bold mb-3">Leave a Review</h2>
+      <textarea id="reviewText" class="w-full p-2 border rounded mb-3" rows="4" placeholder="How was your meal?"></textarea>
+      <button onclick="submitReview()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Submit Review</button>
+    </div>
+  </div>
+
+  <!-- Thank You Page -->
+  <div id="thank-you" class="fixed inset-0 bg-white flex items-center justify-center hidden">
+    <h1 class="text-3xl font-bold text-green-600">🎉 Thank You for Your Order!</h1>
+  </div>
+
+<script>
+  // 🔥 Firebase config (replace with yours if needed)
+  const firebaseConfig = {
+    apiKey: "AIzaSyDN2T8z9fILTmLE7AfIUTEZUZDcJc5lyWo",
+    authDomain: "meals-on-wheels-4d406.firebaseapp.com",
+    databaseURL: "https://meals-on-wheels-4d406-default-rtdb.firebaseio.com",
+    projectId: "meals-on-wheels-4d406",
+    storageBucket: "meals-on-wheels-4d406.firebasestorage.app",
+    messagingSenderId: "839338162117",
+    appId: "1:839338162117:web:32ba607a2f92328d4bfdac",
+    measurementId: "G-4CFY6T113P"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  const mealList = document.getElementById("meal-list");
+  const cartDiv = document.getElementById("cart");
+  const pnrModal = document.getElementById("pnr-modal");
+  const paymentSection = document.getElementById("payment-section");
+  const passengerDetails = document.getElementById("passenger-details");
+  const orderSummary = document.getElementById("order-summary");
+
+  const reviewSection = document.getElementById("review-section");
+  const thankYou = document.getElementById("thank-you");
+
+  let cart = [];
+  let pnrNumber = "";
+  let passengerInfo = {};
+
+  function renderMeals(meals) {
+    mealList.innerHTML = "";
+    meals.forEach(meal => {
+      const card = document.createElement("div");
+      card.className = "bg-white rounded shadow p-4 flex flex-col";
+      card.innerHTML = `
+        <img src="${meal.image}" class="h-40 object-cover rounded mb-3" />
+        <h3 class="text-lg font-semibold">${meal.name}</h3>
+        <p>₹${meal.price}</p>
+        <button class="bg-blue-600 text-white mt-auto px-3 py-2 rounded hover:bg-blue-700" onclick='addToCart(${JSON.stringify(meal)})'>Add to Cart</button>
+      `;
+      mealList.appendChild(card);
+    });
+  }
+
+  async function loadMeals() {
+    const snapshot = await db.collection("meals").get();
+    const meals = snapshot.docs.map(doc => doc.data());
+    renderMeals(meals);
+  }
+
+  function addToCart(meal) {
+    const index = cart.findIndex(m => m.name === meal.name);
+    if (index > -1) cart[index].qty += 1;
+    else cart.push({ ...meal, qty: 1 });
+    renderCart();
+  }
+
+  function updateQty(index, change) {
+    cart[index].qty += change;
+    if (cart[index].qty <= 0) cart.splice(index, 1);
+    renderCart();
+  }
+
+  function renderCart() {
+    cartDiv.innerHTML = "";
+    let total = 0;
+    cart.forEach((item, i) => {
+      total += item.price * item.qty;
+      const row = document.createElement("div");
+      row.className = "flex justify-between items-center border-b pb-2";
+      row.innerHTML = `
+        <span>${item.name} (₹${item.price})</span>
+        <div class="flex items-center">
+          <button onclick="updateQty(${i}, -1)" class="px-2">➖</button>
+          <span>${item.qty}</span>
+          <button onclick="updateQty(${i}, 1)" class="px-2">➕</button>
+        </div>
+      `;
+      cartDiv.appendChild(row);
+    });
+    if (cart.length) {
+      const totalDiv = document.createElement("div");
+      totalDiv.className = "text-right font-bold mt-2";
+      totalDiv.innerText = `Total: ₹${total}`;
+      cartDiv.appendChild(totalDiv);
+    } else {
+      cartDiv.innerHTML = "<p class='text-gray-500'>Cart is empty.</p>";
+    }
+  }
+
+  function openPNRModal() {
+    if (!cart.length) return alert("Cart is empty!");
+    pnrModal.classList.remove("hidden");
+  }
+
+  function closePNRModal(e) {
+    pnrModal.classList.add("hidden");
+  }
+
+  async function proceedToPayment() {
+    const input = document.getElementById("pnrInput").value.trim();
+    if (input.length !== 10) return alert("Enter valid 10-digit PNR");
+    const doc = await db.collection("pnrs").doc(input).get();
+    if (!doc.exists) return alert("PNR not found");
+
+    pnrNumber = input;
+    passengerInfo = doc.data();
+    showPaymentPage();
+    pnrModal.classList.add("hidden");
+  }
+
+  function showPaymentPage() {
+    paymentSection.classList.remove("hidden");
+    passengerDetails.innerHTML = `
+      <p><strong>Name:</strong> ${passengerInfo.name}</p>
+      <p><strong>Train:</strong> ${passengerInfo.train}</p>
+      <p><strong>Seat:</strong> ${passengerInfo.seat}</p>
+    `;
+    orderSummary.innerHTML = cart.map(item =>
+      `<p>${item.name} x ${item.qty} = ₹${item.qty * item.price}</p>`
+    ).join('');
+  }
+
+  function completePayment() {
+    paymentSection.classList.add("hidden");
+    reviewSection.classList.remove("hidden");
+  }
+
+  async function submitReview() {
+    const review = document.getElementById("reviewText").value.trim();
+    await db.collection("transactions").add({
+      pnr: pnrNumber,
+      items: cart,
+      passenger: passengerInfo,
+      review: review,
+      total: cart.reduce((sum, item) => sum + item.price * item.qty, 0),
+      timestamp: new Date()
+    });
+
+    reviewSection.classList.add("hidden");
+    thankYou.classList.remove("hidden");
+    setTimeout(() => thankYou.classList.add("hidden"), 4000);
+    cart = [];
+    renderCart();
+  }
+
+  loadMeals();
+</script>
+</body>
+</html>
