@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module">
+    // Firebase imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+    // Your Firebase config
+    const firebaseConfig = {
+            apiKey: "AIzaSyDN2T8z9fILTmLE7AfIUTEZUZDcJc5lyWo",
+            authDomain: "meals-on-wheels-4d406.firebaseapp.com",
+            databaseURL: "https://meals-on-wheels-4d406-default-rtdb.firebaseio.com",
+            projectId: "meals-on-wheels-4d406",
+            storageBucket: "meals-on-wheels-4d406.firebasestorage.app",
+            messagingSenderId: "839338162117",
+            appId: "1:839338162117:web:32ba607a2f92328d4bfdac",
+            measurementId: "G-4CFY6T113P"
+        };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    async function savePNRData(e) {
+      e.preventDefault();
+      const pnr = document.getElementById("pnr").value;
+      const train = document.getElementById("train").value;
+      const name = document.getElementById("name").value;
+      const age = document.getElementById("age").value;
+      const seat = document.getElementById("seat").value;
+      const coachNumber = document.getElementById("coachNumber").value;
+
+      try {
+        await setDoc(doc(db, "pnrs", pnr), {
+          train,
+          name,
+          age,
+          seat,
+          coachNumber
+        });
+        alert("PNR data saved!");
+      } catch (err) {
+        console.error(err);
+        alert("Error saving data.");
+      }
+    }
+
+    window.savePNRData = savePNRData;
+  </script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <form class="bg-white p-8 rounded shadow w-full max-w-md" onsubmit="savePNRData(event)">
+    <h2 class="text-xl font-bold mb-4">Admin - Add PNR Details</h2>
+    <input id="pnr" type="text" placeholder="PNR Number" required class="w-full mb-4 p-2 border rounded" />
+    <input id="train" type="text" placeholder="Train Name" required class="w-full mb-4 p-2 border rounded" />
+    <input id="name" type="text" placeholder="Passenger Name" required class="w-full mb-4 p-2 border rounded" />
+    <input id="age" type="number" placeholder="Passenger Age" required class="w-full mb-4 p-2 border rounded" />
+    <input id="seat" type="text" placeholder="Seat Number" required class="w-full mb-4 p-2 border rounded" />
+    <input id="coachNumber" type="text" placeholder="Coach Number" required class="w-full mb-4 p-2 border rounded" />
+    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Save</button>
+  </form>
+  <a href="user.html">click</a>
+</body>
+</html>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meal Order - Passenger</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDN2T8z9fILTmLE7AfIUTEZUZDcJc5lyWo",
+      authDomain: "meals-on-wheels-4d406.firebaseapp.com",
+      databaseURL: "https://meals-on-wheels-4d406-default-rtdb.firebaseio.com",
+      projectId: "meals-on-wheels-4d406",
+      storageBucket: "meals-on-wheels-4d406.firebasestorage.app",
+      messagingSenderId: "839338162117",
+      appId: "1:839338162117:web:32ba607a2f92328d4bfdac",
+      measurementId: "G-4CFY6T113P"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let cart = [];
+    let passengerData = {};
+
+    async function fetchPNRDetails(e) {
+      e.preventDefault();
+      const pnr = document.getElementById("pnr").value;
+      const docRef = doc(db, "pnrs", pnr);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        passengerData = docSnap.data();
+        document.getElementById("details").innerHTML = `
+          <div class='bg-white p-4 rounded shadow mb-4'>
+            <h2 class='text-xl font-bold mb-2'>Passenger Details</h2>
+            <p><strong>Name:</strong> ${passengerData.name}</p>
+            <p><strong>Age:</strong> ${passengerData.age}</p>
+            <p><strong>Train:</strong> ${passengerData.train}</p>
+            <p><strong>Coach:</strong> ${passengerData.coach}</p>
+            <p><strong>Coach Number:</strong> ${passengerData.coachNumber}</p>
+            <p><strong>Seat Number:</strong> ${passengerData.seat}</p>
+          </div>
+          <h2 class='text-xl font-bold mb-4'>Select Your Meal</h2>
+          <div class='grid grid-cols-1 md:grid-cols-2 gap-4' id='menuItems'></div>
+          <div class='mt-6'>
+            <h2 class='text-xl font-bold mb-2'>Your Cart</h2>
+            <div id='cart' class='bg-white p-4 rounded shadow'></div>
+            <button onclick='goToPayment()' class='mt-4 bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700'>Proceed to Payment</button>
+          </div>
+        `;
+
+        fetchMenuItems();
+      } else {
+        alert("PNR not found.");
+      }
+    }
+
+    async function fetchMenuItems() {
+      const querySnapshot = await getDocs(collection(db, "meals"));
+      const menuItemsDiv = document.getElementById("menuItems");
+      menuItemsDiv.innerHTML = "";
+      querySnapshot.forEach((doc) => {
+        const item = doc.data();
+        menuItemsDiv.innerHTML += `
+          <div class='border p-4 rounded flex gap-4 items-center'>
+            <img src='${item.image}' alt='${item.name}' class='w-60 rounded' />
+            <div>
+              <h3 class='font-semibold text-lg'>${item.name}</h3>
+              <p class='text-gray-600'>₹${item.price}</p>
+              <button onclick='addToCart("${item.name}", ${item.price})' class='mt-2 bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700'>Add to Cart</button>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    window.addToCart = function (name, price) {
+      const existing = cart.find(item => item.name === name);
+      if (existing) {
+        existing.qty++;
+      } else {
+        cart.push({ name, price, qty: 1 });
+      }
+      renderCart();
+    }
+
+    function renderCart() {
+      const cartDiv = document.getElementById("cart");
+      if (cart.length === 0) {
+        cartDiv.innerHTML = "<p>Your cart is empty.</p>";
+        return;
+      }
+      cartDiv.innerHTML = cart.map((item, index) => `
+        <div class='flex justify-between items-center mb-2'>
+          <span>${item.name} (₹${item.price})</span>
+          <div class='flex items-center gap-2'>
+            <button onclick='changeQty(${index}, -1)' class='px-2 bg-gray-200 rounded'>-</button>
+            <span>${item.qty}</span>
+            <button onclick='changeQty(${index}, 1)' class='px-2 bg-gray-200 rounded'>+</button>
+          </div>
+        </div>
+      `).join('') + `<p class='mt-4 font-bold'>Total: ₹${cart.reduce((acc, item) => acc + item.qty * item.price, 0)}</p>`;
+    }
+
+    window.changeQty = function(index, change) {
+      cart[index].qty += change;
+      if (cart[index].qty <= 0) cart.splice(index, 1);
+      renderCart();
+    }
+
+    window.goToPayment = function() {
+      const main = document.querySelector("body > div");
+      const total = cart.reduce((acc, item) => acc + item.qty * item.price, 0);
+      main.innerHTML = `
+        <div class='bg-white p-6 rounded shadow text-center'>
+          <h2 class='text-2xl font-bold mb-4'>Scan to Pay</h2>
+          <img src='https://api.qrserver.com/v1/create-qr-code/?data=upi://pay?pa=iamkon@upi&am=${total}&currency=INR&tn=Order' alt='QR Code' class='mx-auto mb-4 w-64 h-64'/>
+          <p class='text-lg font-semibold mb-2'>Amount: ₹${total}</p>
+          <p>Scan the QR code above using any UPI app to complete your payment.</p>
+          <button id="doneBtn" class='mt-6 bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 hidden' onclick='generateBill()'>Done</button>
+        </div>
+      `;
+
+      setTimeout(() => {
+        document.getElementById("doneBtn").classList.remove("hidden");
+      }, 5000);
+    }
+
+    window.generateBill = function() {
+      const total = cart.reduce((acc, item) => acc + item.qty * item.price, 0);
+      document.body.innerHTML = `
+        <div class='max-w-2xl mx-auto bg-white shadow p-6 mt-10 rounded'>
+          <h2 class='text-2xl font-bold mb-4 text-center'>Order Bill</h2>
+          <p><strong>Name:</strong> ${passengerData.name}</p>
+          <p><strong>Train:</strong> ${passengerData.train}</p>
+          <p><strong>Coach:</strong> ${passengerData.coach} ${passengerData.coachNumber}</p>
+          <p><strong>Seat:</strong> ${passengerData.seat}</p>
+          <hr class='my-4'>
+          <h3 class='text-lg font-semibold mb-2'>Ordered Items:</h3>
+          ${cart.map(item => `<p>${item.name} x ${item.qty} = ₹${item.qty * item.price}</p>`).join('')}
+          <hr class='my-4'>
+          <p class='text-xl font-bold'>Total: ₹${total}</p>
+          <p class='mt-4 text-center text-green-700 font-semibold'>Payment Successful</p>
+        </div>
+      `;
+    }
+
+    window.fetchPNRDetails = fetchPNRDetails;
+  </script>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+  <div class="max-w-4xl mx-auto">
+    <div class="bg-white p-6 rounded shadow mb-6">
+      <h1 class="text-2xl font-bold mb-4 text-center">Meals on Wheels</h1>
+      <form onsubmit="fetchPNRDetails(event)" class="flex flex-col md:flex-row items-center gap-4">
+        <input id="pnr" type="text" placeholder="Enter PNR Number" required class="flex-1 p-2 border rounded" />
+        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Fetch Details</button>
+      </form>
+    </div>
+    <div id="details"></div>
+  </div>
+</body>
+</html>
