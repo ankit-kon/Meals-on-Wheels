@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Review - Meals On Wheels</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet" />
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-gradient-to-br from-purple-700 to-indigo-600 min-h-screen text-white font-sans">
+
+  <div class="max-w-3xl mx-auto p-6">
+    <h1 class="text-4xl font-bold text-center mb-8">📝 Leave a Review</h1>
+
+    <div class="bg-white text-black rounded-lg shadow-md p-6">
+      <p class="text-lg mb-4">We hope you enjoyed your meal! Please share your feedback below:</p>
+
+      <label class="font-semibold block mb-1">Rate your experience:</label>
+      <div class="flex space-x-2 text-yellow-400 my-3 text-3xl" id="stars">
+        <i class="far fa-star cursor-pointer" data-value="1"></i>
+        <i class="far fa-star cursor-pointer" data-value="2"></i>
+        <i class="far fa-star cursor-pointer" data-value="3"></i>
+        <i class="far fa-star cursor-pointer" data-value="4"></i>
+        <i class="far fa-star cursor-pointer" data-value="5"></i>
+      </div>
+
+      <label for="review" class="font-semibold block mt-4 mb-2">Your Review:</label>
+      <textarea id="review" rows="4" class="w-full p-3 border rounded focus:outline-none focus:ring-2 focus:ring-indigo-400" placeholder="Type your thoughts..."></textarea>
+
+      <button onclick="submitReview()" class="mt-6 w-full bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+        Submit Review
+      </button>
+      <a href="index.html">
+        <button class="mt-4 w-full bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+          Go to Home
+        </button>
+      </a>
+    </div>
+
+    <div id="successMsg" class="hidden mt-6 bg-green-100 text-green-900 rounded-lg shadow-md p-4">
+      <h2 class="text-xl font-bold mb-2">✅ Thank You!</h2>
+      <p>Your review has been submitted successfully.</p>
+    </div>
+  </div>
+
+  <script>
+    // Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyDN2T8z9fILTmLE7AfIUTEZUZDcJc5lyWo",
+      authDomain: "meals-on-wheels-4d406.firebaseapp.com",
+      projectId: "meals-on-wheels-4d406",
+      storageBucket: "meals-on-wheels-4d406.appspot.com",
+      messagingSenderId: "839338162117",
+      appId: "1:839338162117:web:32ba607a2f92328d4bfdac",
+      measurementId: "G-4CFY6T113P"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // Retrieve PNR from localStorage (backup method)
+    let pnr = localStorage.getItem("pnr") || localStorage.getItem("pnrBackup");
+    if (!pnr) {
+      alert("❌ PNR not found. Please return to the home page and enter your PNR.");
+      window.location.href = "index.html";
+    }
+
+    const cart = JSON.parse(localStorage.getItem("cartBackup") || localStorage.getItem("cart") || "[]");
+    let selectedRating = 0;
+
+    const starEls = document.querySelectorAll("#stars i");
+
+    starEls.forEach((star, i) => {
+      star.addEventListener("click", () => {
+        selectedRating = i + 1;
+        updateStarStyles();
+      });
+    });
+
+    function updateStarStyles() {
+      starEls.forEach((star, index) => {
+        if (index < selectedRating) {
+          star.classList.remove("far");
+          star.classList.add("fas");
+        } else {
+          star.classList.remove("fas");
+          star.classList.add("far");
+        }
+      });
+    }
+
+    function submitReview() {
+      const reviewText = document.getElementById("review").value.trim();
+      if (!reviewText || selectedRating === 0) {
+        alert("Please select a rating and write your review.");
+        return;
+      }
+
+      const reviewData = {
+        pnr,
+        rating: selectedRating,
+        review: reviewText,
+        cart,
+        timestamp: new Date().toISOString()
+      };
+
+      db.collection("reviews").add(reviewData).then(() => {
+        document.getElementById("successMsg").classList.remove("hidden");
+        document.getElementById("review").value = "";
+        selectedRating = 0;
+        updateStarStyles();
+
+        localStorage.removeItem("pnr");
+        localStorage.removeItem("pnrBackup");
+        localStorage.removeItem("cart");
+        localStorage.removeItem("cartBackup");
+      }).catch((error) => {
+        console.error("Firestore Error:", error);
+        alert("❌ Failed to submit review. Please try again.");
+      });
+    }
+
+    // Backup PNR if needed
+    if (!localStorage.getItem("pnrBackup") && localStorage.getItem("pnr")) {
+      localStorage.setItem("pnrBackup", localStorage.getItem("pnr"));
+    }
+  </script>
+</body>
+</html>

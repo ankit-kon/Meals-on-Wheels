@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Admin Dashboard - Meals on Wheels</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css" />
+</head>
+
+<body class="bg-gradient-to-r from-indigo-600 to-purple-700 min-h-screen text-white font-sans">
+
+    <!-- Login Form -->
+    <div id="loginSection" class="flex justify-center items-center min-h-screen">
+        <div class="bg-white text-black p-8 rounded shadow-md w-full max-w-md animate__animated animate__fadeInDown">
+            <h2 class="text-2xl font-bold mb-4 text-center">🔐 Admin Login</h2>
+            <input type="email" id="adminEmail" placeholder="Email" class="w-full p-2 mb-4 border rounded" />
+            <input type="password" id="adminPassword" placeholder="Password" class="w-full p-2 mb-4 border rounded" />
+            <button onclick="validateAdmin()"
+                class="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700">Login</button>
+            <p id="loginError" class="text-red-500 text-sm mt-2 hidden">Invalid credentials</p>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="adminDashboard" class="hidden p-6 animate__animated animate__fadeIn">
+        <h1 class="text-4xl font-bold mb-6 text-center">👨‍💼 Admin Dashboard</h1>
+
+        <!-- Controls -->
+        <div class="flex justify-center gap-6 mb-10">
+            <a href="addMeals.html">
+                <button class="bg-green-500 px-4 py-2 rounded hover:bg-green-600">➕ Add Meal</button></a>
+            <a href="addpnr.html"><button class="bg-yellow-500 px-4 py-2 rounded hover:bg-yellow-600">➕ Add PNR</button>
+            </a>
+        </div>
+
+        <!-- Meal and PNR Data -->
+        <div class="grid md:grid-cols-2 gap-8">
+            <div class="bg-white text-black rounded shadow p-4">
+                <h2 class="text-xl font-bold mb-3 text-indigo-700">🍱 Meals List</h2>
+                <div id="mealsList" class="space-y-3 max-h-96 overflow-y-auto"></div>
+            </div>
+            <div class="bg-white text-black rounded shadow p-4">
+                <h2 class="text-xl font-bold mb-3 text-indigo-700">🚆 PNR Records</h2>
+                <div id="pnrList" class="space-y-3 max-h-96 overflow-y-auto"></div>
+            </div>
+            <div class="bg-white text-black rounded shadow p-4">
+                <h2 class="text-xl font-bold mb-3 text-indigo-700">🧾 Orders</h2>
+                <div id="ordersList" class="space-y-3 max-h-96 overflow-y-auto"></div>
+            </div>
+    
+            <div class="bg-white text-black rounded shadow p-4">
+                <h2 class="text-xl font-bold mb-3 text-indigo-700">⭐ Reviews</h2>
+                <div id="reviewsList" class="space-y-3 max-h-96 overflow-y-auto"></div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- Firebase Config -->
+    <script>
+        const firebaseConfig = {
+      apiKey: "AIzaSyDN2T8z9fILTmLE7AfIUTEZUZDcJc5lyWo",
+      authDomain: "meals-on-wheels-4d406.firebaseapp.com",
+      databaseURL: "https://meals-on-wheels-4d406-default-rtdb.firebaseio.com",
+      projectId: "meals-on-wheels-4d406",
+      storageBucket: "meals-on-wheels-4d406.firebasestorage.app",
+      messagingSenderId: "839338162117",
+      appId: "1:839338162117:web:32ba607a2f92328d4bfdac",
+      measurementId: "G-4CFY6T113P"
+    };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        function validateAdmin() {
+            const email = document.getElementById("adminEmail").value;
+            const password = document.getElementById("adminPassword").value;
+
+            if (email === "admin@gmail.com" && password === "admin") {
+                document.getElementById("loginSection").classList.add("hidden");
+                document.getElementById("adminDashboard").classList.remove("hidden");
+                loadMeals();
+                loadPNRs();
+                loadOrders(); 
+                loadReviews(); 
+            } else {
+                document.getElementById("loginError").classList.remove("hidden");
+            }
+        }
+
+        async function loadMeals() {
+            const mealsList = document.getElementById("mealsList");
+            mealsList.innerHTML = "";
+
+            const snapshot = await db.collection("meals").get();
+            snapshot.forEach(doc => {
+                const meal = doc.data();
+                mealsList.innerHTML += `
+          <div class="border-b pb-2">
+            <strong>${meal.name}</strong> - ₹${meal.price}<br/>
+            <small>${meal.description}</small>
+          </div>
+        `;
+            });
+        }
+
+        async function loadPNRs() {
+            const pnrList = document.getElementById("pnrList");
+            pnrList.innerHTML = "";
+
+            const snapshot = await db.collection("pnrs").get();
+            snapshot.forEach(doc => {
+                const pnr = doc.data();
+                pnrList.innerHTML += `
+          <div class="border-b pb-2">
+            <strong>${pnr.name}</strong> (${doc.id})<br/>
+            ${pnr.train} (${pnr.trainNumber}) - Seat ${pnr.coachNumber} ${pnr.seat}
+          </div>
+        `;
+            });
+        }
+
+        function showAddMealForm() {
+            const name = prompt("Enter meal name:");
+            const price = prompt("Enter price:");
+            const description = prompt("Enter description:");
+            const image = prompt("Enter image URL:");
+
+            if (name && price) {
+                db.collection("meals").add({ name, price: parseInt(price), description, image }).then(loadMeals);
+            }
+        }
+
+        function showAddPNRForm() {
+            const pnr = prompt("Enter PNR number:");
+            const name = prompt("Passenger name:");
+            const train = prompt("Train name:");
+            const trainNumber = prompt("Train number:");
+            const fromStation = prompt("From station:");
+            const toStation = prompt("To station:");
+            const seat = prompt("Seat number:");
+            const coachNumber = prompt("Coach number:");
+
+            if (pnr && name) {
+                db.collection("pnrs").doc(pnr).set({ name, train, trainNumber, fromStation, toStation, seat, coachNumber }).then(loadPNRs);
+            }
+        }
+
+        async function loadOrders() {
+            
+            const ordersList = document.getElementById("ordersList");
+            ordersList.innerHTML = "";
+
+            const snapshot = await db.collection("history").get();
+            snapshot.forEach(doc => {
+                const order = doc.data();
+                ordersList.innerHTML += `
+      <div class="border-b pb-2">
+        <strong>PNR:</strong> ${order.pnr} <br/>
+        <strong>Total:</strong> ₹${order.total} <br/>
+        <strong>Items:</strong>
+<ul class="list-disc ml-5">
+  ${Object.values(order.items).map(item => `<li>${item.name} x${item.quantity}</li>`).join('')}
+</ul>
+
+      </div>
+    `;
+            });
+        }
+
+        async function loadReviews() {
+            const reviewsList = document.getElementById("reviewsList");
+            reviewsList.innerHTML = "";
+
+            const snapshot = await db.collection("reviews").get();
+            snapshot.forEach(doc => {
+                const review = doc.data();
+                reviewsList.innerHTML += `
+      <div class="border-b pb-2">
+        <strong>PNR:</strong> ${review.pnr} <br/>
+        <strong>Rating:</strong> ${review.rating} ⭐<br/>
+        <strong>Feedback:</strong> ${review.review}
+      </div>
+    `;
+            });
+        }
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Checkout - Meals On Wheels</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-600 to-purple-700 min-h-screen text-white font-sans">
+
+  <div class="max-w-5xl mx-auto p-6 animate__animated animate__fadeIn">
+    <h1 class="text-4xl font-bold text-center mb-6">🧾 Checkout</h1>
+
+    <!-- Passenger Info -->
+
+    <!-- Cart Summary -->
+    <div class="bg-white text-black rounded-lg shadow-md p-4 mb-6 animate__animated animate__fadeInUp">
+      <h2 class="text-2xl font-bold mb-4">🍽️ Order Summary</h2>
+      <div id="cartItems" class="space-y-3"></div>
+      <div class="mt-4 text-right text-lg font-bold text-indigo-700">Total: ₹<span id="total">0</span></div>
+    </div>
+
+    <!-- Payment Options -->
+    <div class="bg-white text-black rounded-lg shadow-md p-4 mb-6 animate__animated animate__fadeInUp">
+      <h2 class="text-2xl font-bold mb-4">💳 Payment</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block mb-2 font-semibold">UPI ID</label>
+          <input type="text" class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter your UPI ID" />
+          <button onclick="placeOrder()" class="mt-4 w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Pay & Place Order</button>
+        </div>
+        <div class="text-center">
+          <h3 class="font-bold mb-2">Scan to Pay</h3>
+          <img src="https://api.qrserver.com/v1/create-qr-code/?data=upi://pay?pa=iamkon@upi&size=200x200" alt="QR" class="mx-auto rounded">
+          <p class="text-gray-600 text-sm mt-1">Scan using your UPI app</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Receipt -->
+    <div id="receipt" class="hidden bg-green-100 text-green-900 rounded-lg shadow-md p-4 animate__animated animate__fadeInUp">
+      <h2 class="text-xl font-bold mb-2">✅ Payment Successful</h2>
+      <p>Thank you for your order! Your food will be delivered soon.</p>
+      <button onclick="goToReview()" class="mt-4 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Leave a Review</button>
+    </div>
+  </div>
+
+  <script>
+    // Firebase Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyDN2T8z9fILTmLE7AfIUTEZUZDcJc5lyWo",
+      authDomain: "meals-on-wheels-4d406.firebaseapp.com",
+      projectId: "meals-on-wheels-4d406",
+      storageBucket: "meals-on-wheels-4d406.appspot.com",
+      messagingSenderId: "839338162117",
+      appId: "1:839338162117:web:32ba607a2f92328d4bfdac"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const pnr = localStorage.getItem("pnr");
+    const cart = JSON.parse(localStorage.getItem("cart") || "{}");
+
+    function loadPassengerDetails() {
+      if (!pnr) {
+        document.getElementById("passengerInfo").innerHTML = `<p class="text-red-600">PNR not found.</p>`;
+        return;
+      }
+
+      fetch("https://meals-on-wheels-4d406.firebaseio.com/pnrs/" + pnr + ".json")
+        .then(res => res.json())
+        .then(data => {
+          if (!data) {
+            document.getElementById("passengerInfo").innerHTML = `<p class="text-red-600">PNR not found.</p>`;
+            return;
+          }
+
+          document.getElementById("passengerInfo").innerHTML = `
+            <h2 class="text-xl font-bold text-indigo-700 mb-2">👤 Passenger Details</h2>
+            <p><strong>Name:</strong> ${data.name}</p>
+            <p><strong>Train:</strong> ${data.train} (${data.trainNumber})</p>
+            <p><strong>Seat:</strong> ${data.coachNumber} - ${data.seat}</p>
+            <p><strong>From:</strong> ${data.fromStation} → <strong>To:</strong> ${data.toStation}</p>
+            <p><strong>PNR:</strong> ${pnr}</p>
+          `;
+        });
+    }
+
+    function loadCart() {
+      const cartItemsDiv = document.getElementById("cartItems");
+      let total = 0;
+
+      cartItemsDiv.innerHTML = Object.entries(cart).map(([id, item]) => {
+        const itemTotal = item.price * item.quantity;
+        total += itemTotal;
+        return `
+          <div class="flex justify-between border-b pb-2">
+            <div>
+              <p class="font-semibold">${item.name}</p>
+              <p class="text-sm text-gray-600">₹${item.price} × ${item.quantity}</p>
+            </div>
+            <p class="font-bold text-indigo-600">₹${itemTotal}</p>
+          </div>
+        `;
+      }).join("");
+
+      document.getElementById("total").innerText = total;
+    }
+
+    function placeOrder() {
+      const total = Object.values(cart).reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+      const orderData = {
+        pnr,
+        items: cart,
+        total,
+        timestamp: new Date()
+      };
+
+      db.collection("history").add(orderData)
+        .then(() => {
+          document.getElementById("receipt").classList.remove("hidden");
+          document.getElementById("receipt").scrollIntoView({ behavior: "smooth" });
+          localStorage.removeItem("cart");
+        })
+        .catch(error => {
+          console.error("Error adding order to Firebase:", error);
+          alert("❌ Failed to place order. Please try again.");
+        });
+    }
+
+    function goToReview() {
+      window.location.href = "review.html";
+    }
+
+    loadPassengerDetails();
+    loadCart();
+  </script>
+</body>
+</html>

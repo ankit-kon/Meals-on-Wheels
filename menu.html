@@ -150,10 +150,26 @@
   }
 
   function checkout() {
-    alert("Proceeding to checkout...");
-    // You can redirect to payment page or Firebase logic here
-    closeCartModal();
+  const cartData = JSON.parse(localStorage.getItem("cart")) || {};
+  const pnrNumber = localStorage.getItem("pnr");
+
+  if (Object.keys(cartData).length === 0) {
+    alert("Your cart is empty.");
+    return;
   }
+
+  if (!pnrNumber) {
+    alert("PNR not found. Please go back and enter a valid PNR.");
+    return;
+  }
+
+  // Everything looks good, go to checkout
+  window.location.href = "checkout.html";
+  closeCartModal();
+}
+
+
+  
 
   async function fetchPNRDetails() {
     const pnr = localStorage.getItem("pnr");
